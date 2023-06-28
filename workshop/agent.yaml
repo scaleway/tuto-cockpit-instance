@@ -1,0 +1,112 @@
+server:
+  log_level: info
+
+metrics:
+  wal_directory: /tmp/agent
+  global:
+    scrape_interval: 15s
+    remote_write:
+    - url: https://metrics.prd.obs.fr-par.scw.cloud/api/v1/push
+      headers:
+        "X-Token": "your token"
+
+  configs:
+    - name: agent
+      scrape_configs:
+        # NGINX config
+        - job_name: nginx
+          static_configs:
+          - targets: [localhost:9113]
+            labels:
+              job: nginx
+        # Postfix config
+        - job_name: postfix
+          static_configs:
+          - targets: [localhost:9154]
+            labels:
+              job: postfix
+
+integrations:
+  node_exporter:
+    enabled: true
+    rootfs_path: /
+    sysfs_path: /sys
+    procfs_path: /proc
+
+  postgres_exporter:
+    enabled: true
+    data_source_names:
+      - "postgresql://linus:42secret@localhost:5432/postgres?sslmode=disable"
+
+  mysqld_exporter:
+    enabled: true
+    instance: mysql-01
+    data_source_name: "root:42secret@(localhost:3306)/"
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: job
+        replacement: 'integrations/mysql'
+  
+  # Docker config
+  cadvisor:
+    enabled: true
+    docker_only: true
+    instance: localhost:9090
+    relabel_configs:
+      - action: replace
+        replacement: integrations/docker
+        target_label: job
+
+logs:
+  configs:
+    - name: agent
+      clients:
+        - url: https://logs.prd.obs.fr-par.scw.cloud/loki/api/v1/push
+          tenant_id: "your token"
+      positions:
+        filename: /tmp/positions.yaml
+      target_config:
+        sync_period: 10s 
+      scrape_configs:
+        # Grab docker logs
+        - job_name: integrations/docker
+          docker_sd_configs:
+            - host: unix:///var/run/docker.sock
+              refresh_interval: 5s
+          relabel_configs:
+            - action: replace    
+              replacement: integrations/docker
+              source_labels: 
+                - __meta_docker_container_id
+              target_label: job 
+            - source_labels: 
+                - __meta_docker_container_name
+              regex: '/(.*)'
+              target_label: container
+            - source_labels: 
+                - __meta_docker_container_log_stream
+              target_label: stream
+
+        # Grab all logs, dmesg, syslog & journal
+        - job_name: varlogs
+          static_configs:
+          - targets: [localhost]
+            labels:
+              job: varlogs
+              __path__: /var/log/**/*.log
+        - job_name: dmesg
+          static_configs:
+          - targets: [localhost]
+            labels:
+              job: dmesg
+              __path__: /var/log/dmesg
+        - job_name: journal
+          journal:
+            labels:
+              job: journal
+          relabel_configs:
+            - source_labels: ['__journal__systemd_unit']
+              target_label: 'unit'
+
+        
+
