@@ -6,7 +6,7 @@ metrics:
   global:
     scrape_interval: 15s
     remote_write:
-    - url: https://metrics.prd.obs.fr-par.scw.cloud/api/v1/push
+    - url: https://metrics.cockpit.fr-par.scw.cloud/api/v1/push
       headers:
         "X-Token": "your token"
 
@@ -61,7 +61,7 @@ logs:
   configs:
     - name: agent
       clients:
-        - url: https://logs.prd.obs.fr-par.scw.cloud/loki/api/v1/push
+        - url: https://logs.cockpit.fr-par.scw.cloud/loki/api/v1/push
           tenant_id: "your token"
       positions:
         filename: /tmp/positions.yaml
